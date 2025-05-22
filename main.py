@@ -3811,8 +3811,21 @@ class TaskScheduler(QObject):
                 sleep_interval = self.config.get("TASK_POLLING_INTERVAL", 1.0) # 使用 1 秒间隔
                 time.sleep(sleep_interval)
 
+            except SystemExit: # Allow SystemExit to propagate (e.g., from sys.exit())
+                logger.info("Scheduler loop received SystemExit, setting stop_event and re-raising.")
+                self.stop_event.set() # Ensure stop_event is set for a clean exit
+                raise # Re-raise to allow Python to exit
+            except KeyboardInterrupt: # Allow KeyboardInterrupt to propagate
+                logger.info("Scheduler loop interrupted by KeyboardInterrupt, setting stop_event and breaking.")
+                self.stop_event.set() # Ensure graceful shutdown on Ctrl+C
+                break # Exit the loop
             except Exception as e:
-                self.stop_event.set()
+                # Log critical error but continue loop for most exceptions.
+                logger.critical("Unhandled exception in scheduler loop iteration %s: %s", loop_count, e, exc_info=True)
+                # Optional: Add a slightly longer delay here if errors are very rapid,
+                # to prevent log spamming and high CPU, but continue the loop.
+                # time.sleep(self.config.get("TASK_POLLING_INTERVAL", 1.0) * 5) # e.g., wait 5x polling interval
+                continue # Continue to the next iteration
 
     def _process_running_tasks(self) -> bool:
         """按顺序轮询执行每个运行中任务的下一步。返回是否有任务被处理。"""
