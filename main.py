@@ -17,6 +17,7 @@ import uuid
 from PIL import Image
 import io
 import re
+import ast # For safely parsing kernel string
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Optional, Dict, Any, List, Tuple, Callable, Union
@@ -130,6 +131,29 @@ DEFAULT_CONFIG = {
     "HOME_SCREEN_TEMPLATE_NAME": None,  # 全局默认不使用模板验证主屏幕
     "HOME_SCREEN_TEMPLATE_THRESHOLD": 0.85,  # 全局默认模板阈值（如果使用模板）
     # --- 新增配置结束 ---
+    # --- Image Enhancement Config ---
+    # Controls the image enhancement pipeline applied before OCR.
+    # Order of operations: Deskewing -> Noise Reduction -> CLAHE -> Sharpening -> Adaptive Thresholding.
+
+    "ENHANCE_IMAGE_DESKEWING": False, # bool: Whether to attempt to correct skewed text. Default: False.
+                                     # Deskewing is applied first to the original color image if enabled.
+
+    "ENHANCE_IMAGE_NOISE_REDUCTION": True, # bool: Whether to apply Gaussian blur for noise reduction. Default: True.
+    "ENHANCE_IMAGE_GAUSSIAN_BLUR_KERNEL_SIZE": (5, 5), # tuple (int, int): Kernel size for Gaussian blur, e.g., (5, 5). Both values must be positive and odd. Default: (5, 5).
+
+    # CLAHE (Contrast Limited Adaptive Histogram Equalization) is always applied after noise reduction.
+
+    "ENHANCE_IMAGE_SHARPENING": False, # bool: Whether to apply a sharpening filter. Applied after CLAHE. Default: False.
+                                      # Can sometimes improve OCR but may also amplify noise.
+    "ENHANCE_IMAGE_SHARPENING_KERNEL": "[[0, -1, 0], [-1, 5, -1], [0, -1, 0]]", # string: String representation of a 2D numpy array for the sharpening kernel.
+                                                                              # Default: "[[0, -1, 0], [-1, 5, -1], [0, -1, 0]]" (a common sharpening kernel).
+                                                                              # Parsed using ast.literal_eval.
+
+    "ENHANCE_IMAGE_ADAPTIVE_THRESHOLDING": True, # bool: Whether to apply adaptive thresholding for binarization. Applied last. Default: True.
+    "ENHANCE_IMAGE_ADAPTIVE_THRESHOLDING_METHOD": "gaussian", # string: "gaussian" or "mean". Method for adaptive thresholding. Default: "gaussian".
+                                                            # cv2.ADAPTIVE_THRESH_GAUSSIAN_C or cv2.ADAPTIVE_THRESH_MEAN_C.
+    "ENHANCE_IMAGE_ADAPTIVE_THRESHOLDING_BLOCK_SIZE": 11, # int: Size of the pixel neighborhood for adaptive thresholding. Must be an odd integer > 1. Default: 11.
+    "ENHANCE_IMAGE_ADAPTIVE_THRESHOLDING_C": 2, # int: Constant subtracted from the mean or weighted mean in adaptive thresholding. Default: 2.
 }
 # Example Device Config:
 # "DEVICE_CONFIGS": {
@@ -924,14 +948,115 @@ class ScreenshotManager:
             self.mutex.unlock()
 
     def enhance_image(self, image: Optional[np.ndarray]) -> Optional[np.ndarray]:
-        """Enhances image quality for potentially better OCR."""
+        """
+        Enhances image quality for potentially better OCR through a configurable pipeline.
+        The pipeline order is: Deskewing -> Noise Reduction -> CLAHE -> Sharpening -> Adaptive Thresholding.
+        Each optional step is controlled by a corresponding configuration flag.
+        """
         if image is None:
+            logger.debug("enhance_image called with None input image.")
             return None
+
+        # Start with a copy of the original image.
+        # If any step in the main try-except block fails catastrophically, the original 'image' is returned.
+        # Individual steps aim to use 'processed_image' and fall back to their input if they fail.
+        processed_image = image.copy()
+
         try:
+            # --- Step 0: Optional Deskewing ---
+            # Corrects the orientation of skewed text. Applied to the color image.
+            enable_deskewing = self.config.get("ENHANCE_IMAGE_DESKEWING", False)
+            if enable_deskewing:
+                logger.debug("Attempting Deskewing...")
+                try:
+                    # Convert a copy to grayscale for angle detection
+                    gray_for_deskew = cv2.cvtColor(processed_image, cv2.COLOR_BGR2GRAY)
+
+                    # Apply Otsu's threshold to get a binary image
+                    _, thresh = cv2.threshold(gray_for_deskew, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+                    # Find contours of text blocks
+                    contours, _ = cv2.findContours(thresh, cv2.RETR_LIST, cv2.CHAIN_APPROX_SIMPLE)
+
+                    if contours:
+                        # Assume the largest contour corresponds to the main text block
+                        largest_contour = max(contours, key=cv2.contourArea)
+
+                        # Only proceed if the contour is of a reasonable size to avoid noise
+                        if cv2.contourArea(largest_contour) > 100: # Heuristic value
+                            rect = cv2.minAreaRect(largest_contour) # ((center_x, center_y), (width, height), angle)
+                            angle = rect[-1]
+
+                            # Adjust angle: cv2.minAreaRect returns angles in [-90, 0).
+                            # If width < height (box is tall), it means the angle is relative to the vertical axis.
+                            # Add 90 to make it relative to the horizontal axis.
+                            if rect[1][0] < rect[1][1]: # width < height
+                                angle += 90
+
+                            # Normalize angle to be within -45 to +45 degrees for optimal rotation.
+                            # If angle is, e.g., -70, it's better to rotate by +20.
+                            # If angle is, e.g., +70, it's better to rotate by -20.
+                            if angle < -45.0:
+                                angle += 90.0
+                            elif angle > 45.0:
+                                angle -= 90.0
+
+                            # Only rotate if the skew is significant enough
+                            if abs(angle) > 0.5: # Heuristic: 0.5 degrees
+                                logger.info(f"Deskewing: Detected raw angle: {rect[-1]:.2f}, Adjusted for rotation: {angle:.2f} degrees.")
+                                (h, w) = processed_image.shape[:2]
+                                center = (w // 2, h // 2)
+
+                                # Get rotation matrix
+                                M = cv2.getRotationMatrix2D(center, angle, 1.0)
+
+                                # Calculate the new bounding box dimensions to fit the entire rotated image
+                                cos_abs = np.abs(M[0, 0])
+                                sin_abs = np.abs(M[0, 1])
+                                new_w = int((h * sin_abs) + (w * cos_abs))
+                                new_h = int((h * cos_abs) + (w * sin_abs))
+
+                                # Adjust the rotation matrix to take into account translation for the new bounding box
+                                M[0, 2] += (new_w / 2) - center[0]
+                                M[1, 2] += (new_h / 2) - center[1]
+
+                                # Apply the affine transformation to the original BGR image
+                                processed_image = cv2.warpAffine(processed_image, M, (new_w, new_h),
+                                                                 flags=cv2.INTER_CUBIC,
+                                                                 borderMode=cv2.BORDER_CONSTANT,
+                                                                 borderValue=(255, 255, 255)) # Fill new areas with white
+                                logger.debug("Deskewing applied successfully.")
+                            else:
+                                logger.debug(f"Deskewing: Angle {angle:.2f} too small, no rotation applied.")
+                        else:
+                            logger.debug("Deskewing: Largest contour too small, skipping rotation.")
+                    else:
+                        logger.debug("Deskewing: No contours found, skipping rotation.")
+                except Exception as deskew_err:
+                    logger.error(f"Error during deskewing process: {deskew_err}", exc_info=True)
+                    # If deskewing fails, 'processed_image' remains the original (or from previous step if any)
+
+            # --- Step 1: Optional Gaussian Blur for Noise Reduction ---
+            # Applied to the (potentially deskewed) BGR image.
+            enable_noise_reduction = self.config.get("ENHANCE_IMAGE_NOISE_REDUCTION", True)
+            if enable_noise_reduction:
+                kernel_size_tuple = self.config.get("ENHANCE_IMAGE_GAUSSIAN_BLUR_KERNEL_SIZE", (5, 5))
+                kernel_w = int(kernel_size_tuple[0])
+                kernel_h = int(kernel_size_tuple[1])
+                if kernel_w > 0 and kernel_h > 0 and kernel_w % 2 == 1 and kernel_h % 2 == 1:
+                    logger.debug(f"Applying Gaussian Blur with kernel size: {(kernel_w, kernel_h)}")
+                    enhanced_image = cv2.GaussianBlur(enhanced_image, (kernel_w, kernel_h), 0)
+                else:
+                    logger.warning(
+                        f"Invalid Gaussian blur kernel size: {kernel_size_tuple}. "
+                        f"Both dimensions must be positive and odd. Skipping blur."
+                    )
+
+            # Step 2: CLAHE for Contrast Enhancement
             # Convert to LAB color space for CLAHE
-            lab = cv2.cvtColor(image, cv2.COLOR_BGR2LAB)
+            lab = cv2.cvtColor(enhanced_image, cv2.COLOR_BGR2LAB)
             l, a, b = cv2.split(lab)
-            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))  # Reduced clipLimit slightly
+            clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
             cl = clahe.apply(l)
             enhanced_lab = cv2.merge((cl, a, b))
             enhanced_image = cv2.cvtColor(enhanced_lab, cv2.COLOR_LAB2BGR)
@@ -944,7 +1069,7 @@ class ScreenshotManager:
             return enhanced_image
         except Exception as e:
             logger.error(f"Image enhancement error: {e}", exc_info=True)
-            return image  # Return original on error
+            return image # Return original on error (not the copy that might be partially processed)
 
 
 class AIAnalyzer:
