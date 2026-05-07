@@ -1,0 +1,14 @@
+config.json
+config.json.bak
+*.log
+
+screenshots/
+templates/
+
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+.env
+*.env

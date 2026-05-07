@@ -1,143 +1,121 @@
-# OCR驱动的桌面自动化工具
+# OCR-Driven Three-Axis Automation Tool
 
-一个基于Python的应用程序，它使用屏幕捕获、先进的图像处理、OCR和AI来自动化控制通过三轴机械臂连接的物理设备上的复杂任务。
+This is an early Python desktop automation project for controlling a physical device through a three-axis machine.
 
-## 简介 (Overview)
+The project combines screen capture, image processing, OCR, AI-assisted decision making, task scheduling, and ESP-based hardware control. It was built for situations where a target device cannot be controlled through a normal software API, so the automation system observes the screen and performs physical interactions instead.
 
-本项目是一个为解决物理设备（如智能手机）缺乏传统API接口而设计的自动化工具。它的工作流程如下：
-1.  **屏幕捕获**: 通过ADB捕获连接设备的屏幕。
-2.  **图像处理**: 对图像进行处理，显著增强其清晰度，以提高OCR识别准确率。
-3.  **元素识别**: 使用OCR服务和模板匹配识别屏幕上的文本和UI元素。
-4.  **执行操作**: 通过一个定制的三轴硬件控制器（由ESP微控制器驱动）执行点击、滑动等物理操作。
+## What It Does
 
-其主要目标是在无法进行直接软件集成的设备上，自动执行重复性任务、进行自动化测试或控制应用程序。
+The basic workflow is:
 
-## 功能亮点 (Features)
+1. Capture a screen image from an Android device through ADB.
+2. Improve the screenshot with OpenCV image processing.
+3. Use OCR and template matching to locate text and UI elements.
+4. Use either predefined task steps or an AI model to decide the next action.
+5. Send commands to an ESP-based controller that drives a three-axis mechanism.
+6. Repeat until the task is complete or requires human intervention.
 
--   **🤖 强大的任务自动化引擎**:
-    -   **AI驱动模式**: 利用大语言模型（LLM）分析屏幕内容，并决定实现目标的最佳下一步操作。
-    -   **子任务模式**: 通过预定义的、精确的步骤序列（如 `find_and_click_text`, `wait`, `loop`, `check_template_exists`）来执行复杂的工作流。
--   **🖼️ 先进的图像增强管道**:
-    -   包含CLAHE（对比度限制自适应直方图均衡）等技术，可显著提升屏幕截图质量，从而获得更高的OCR准确率，尤其是在低质量显示屏上。
--   **🎯 精准的硬件控制**:
-    -   与基于ESP的三轴机械臂通信，以高精度执行物理交互，如点击、长按和滑动。
-    -   支持为不同设备和物理设置配置坐标映射。
--   **✅ 稳健的任务调度器**:
-    -   一个多线程调度器管理着一个任务优先队列。
-    -   处理任务分配、错误处理和失败重试。
--   **🖥️ 功能完善的图形用户界面**:
-    -   基于PyQt5构建，用于管理设备、任务和系统设置。
-    -   通过实时屏幕视图、OCR结果和详细日志提供即时反馈。
--   **🧩 模板匹配**:
-    -   使用OpenCV来视觉定位和交互那些无法单靠文本识别的图标和UI元素。
+## Features
 
-## 可视化展示 (Demo)
+- PyQt5 desktop interface for device, task, OCR, AI, and controller settings.
+- ADB screenshot capture with configurable device ID and resolution.
+- OCR integration through a local OCR HTTP service.
+- OpenCV-based image enhancement and template matching.
+- AI-assisted action planning through a configurable chat-completions API.
+- Task scheduling, retry handling, and state tracking.
+- ESP controller integration for physical click, long-press, and movement commands.
+- Local configuration through `config.json`.
 
-### 图像增强效果对比
+## Privacy and Configuration
 
-这张图展示了图像处理管道如何改善低质量的屏幕截图，使其能被OCR引擎清晰地识别。
+Do not commit your real runtime configuration.
 
-**[待办]**: 请您亲自创建这张对比图并替换此处的占位符。例如:
-`![图像增强效果](assets/enhancement_comparison.png)`
-
-### 系统工作流程图
-
-此图表展示了系统内部的数据流和操作逻辑。
-
-**[待办]**: 请您亲自绘制此流程图并替换此处的占位符。例如:
-`![系统工作流程](assets/workflow.png)`
-*流程: `[截取屏幕] -> [图像预处理] -> [OCR与模板匹配] -> [AI或子任务逻辑] -> [执行硬件控制指令]`*
-
-### GIF动态操作演示
-
-一个动态演示，展示工具自动化完成任务的全过程。
-
-**[待办]**: 请您亲自录制此GIF动图并替换此处的占位符。例如:
-`![GIF操作演示](assets/demo.gif)`
-
-## 技术栈 (Tech Stack)
-
--   **语言**: Python 3
--   **GUI**: PyQt5
--   **核心库**:
-    -   OpenCV (`opencv-python`)
-    -   Pillow
-    -   NumPy
-    -   Requests
--   **硬件**: ESP-12F 或类似微控制器，用于三轴控制。
--   **外部服务**:
-    -   一个通过ADB连接的设备用于屏幕捕获。
-    -   一个OCR服务 (如 Umi-OCR) 的API端点。
-    -   一个AI/LLM服务 (如 灵一万物) 的API端点。
-
-## 安装与运行 (Getting Started)
-
-请遵循以下步骤来启动和运行项目。
-
-### 1. 环境要求
-
--   Python 3.8+
--   Android调试桥 (ADB)
--   一个基于ESP并刷入相应固件的三轴硬件控制器。
--   一个开启了USB调试模式的安卓设备。
-
-### 2. 克隆项目
+This repository includes `config.example.json` as a safe template. Copy it locally when you need to run the project:
 
 ```bash
-git clone https://github.com/Feibafly2/autoControlBasedOnThreeAxisMechine.git
-cd autoControlBasedOnThreeAxisMechine
+cp config.example.json config.json
 ```
 
-### 3. 安装依赖
+Then edit `config.json` with your own local values.
 
-推荐使用虚拟环境。
+Sensitive local files are ignored by Git:
+
+- `config.json`
+- `config.json.bak`
+- `*.log`
+- `screenshots/`
+- `templates/`
+- `.env`
+
+For AI credentials, prefer using an environment variable:
+
 ```bash
-# 创建虚拟环境
-python -m venv venv
-# 激活虚拟环境 (Windows下为 `venv\Scripts\activate`)
-source venv/bin/activate
-# 安装依赖
-pip install -r requirements.txt
+set SMARTPHONE_AUTOMATION_AI_API_KEY=your_key_here
 ```
 
-### 4. 配置应用
+On macOS/Linux:
 
-在项目根目录中，通过复制以下模板创建一个 `config.json` 文件。
+```bash
+export SMARTPHONE_AUTOMATION_AI_API_KEY=your_key_here
+```
 
-**`config.json` 模板:**
+## Example Configuration
+
 ```json
 {
-    "ESP_IP": "192.168.101.11",
-    "ESP_PORT": 8080,
-    "OCR_API_URL": "http://127.0.0.1:1224/api/ocr",
-    "AI_API_URL": "https://api.lingyiwanwu.com/v1/chat/completions",
-    "AI_API_KEY": "YOUR_AI_API_KEY_HERE",
-    "AI_MODEL": "yi-large-rag",
-    "ADB_PATH": "adb",
-    "CAMERA_DEVICE_ID": "YOUR_ADB_DEVICE_ID",
-    "DEVICE_CONFIGS": {
-        "My_Phone_1": {
-            "SCREENSHOT_RESOLUTION": [1080, 1920],
-            "CROPPED_RESOLUTION": [1080, 1440],
-            "HOME_SCREEN_ANCHOR_TEXTS": ["电话", "短信", "相机"],
-            "HOME_SCREEN_MIN_ANCHORS": 2,
-            "machine_origin_x": 0,
-            "machine_origin_y": 0
-        }
-    },
-    "USER_TASKS": []
+  "ESP_IP": "192.0.2.10",
+  "ESP_PORT": 8080,
+  "OCR_API_URL": "http://127.0.0.1:1224/api/ocr",
+  "AI_API_URL": "https://api.example.com/v1/chat/completions",
+  "AI_API_KEY": "",
+  "AI_MODEL": "example-model",
+  "ADB_PATH": "adb",
+  "CAMERA_DEVICE_ID": "",
+  "DEVICE_CONFIGS": {
+    "Device_Example": {
+      "SCREENSHOT_RESOLUTION": [1080, 1920],
+      "CROPPED_RESOLUTION": [1080, 1440],
+      "HOME_SCREEN_ANCHOR_TEXTS": ["Phone", "Messages", "Settings", "Camera", "Gallery"],
+      "HOME_SCREEN_MIN_ANCHORS": 3,
+      "machine_origin_x": 0,
+      "machine_origin_y": 0
+    }
+  },
+  "USER_TASKS": []
 }
 ```
 
-**关键配置项说明:**
--   `ESP_IP`, `ESP_PORT`: 你的硬件控制器的IP地址和端口。
--   `OCR_API_URL`: 你的OCR服务的端点地址。
--   `AI_API_KEY`: 你的AI服务的API密钥。
--   `CAMERA_DEVICE_ID`: 你的安卓设备的ID，可通过运行 `adb devices` 命令查看。
--   `DEVICE_CONFIGS`: 在这里定义每个物理设备。键名 (`My_Phone_1`) 是你为设备指定的唯一名称。
+`192.0.2.10` is a documentation-only example address. Replace it with your local controller address in your private `config.json`.
 
-### 5. 运行项目
+## Installation
+
+Requirements:
+
+- Python 3.8+
+- ADB
+- A local OCR service such as Umi-OCR
+- An ESP-based controller and compatible three-axis hardware
+
+Install Python dependencies:
+
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+Run:
 
 ```bash
 python main.py
 ```
+
+## Project Status
+
+This is an early prototype. It is useful as a record of the architecture and experimentation, but it still needs refactoring before it should be treated as production software.
+
+The current implementation is mostly contained in a single large `main.py`, so future work should prioritize splitting the project into modules, improving tests, and making configuration safer by design.
+
+## Security Notes
+
+See `SECURITY.md` before publishing screenshots, logs, templates, or real device configuration.

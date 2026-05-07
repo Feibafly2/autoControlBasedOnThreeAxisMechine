@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import shutil
+import copy
 import sys
 import os
 import time
@@ -60,7 +61,7 @@ ai_decision_logger.propagate = False
 
 # 全局配置 (Defaults)
 DEFAULT_CONFIG = {
-    "ESP_IP": "192.168.101.11",
+    "ESP_IP": "192.0.2.10",
     "ESP_PORT": 8080,
     "SCREENSHOT_RESOLUTION": (1080, 1980),  # Default, can be overridden per device
     "CROPPED_RESOLUTION": (1080, 1440),  # Default, can be overridden per device
@@ -90,7 +91,7 @@ DEFAULT_CONFIG = {
             "CROPPED_RESOLUTION": [1080, 1440],
             "HOME_SCREEN_TEMPLATE_NAME": "home_template_example",
             "HOME_SCREEN_TEMPLATE_THRESHOLD": 0.8,
-            "HOME_SCREEN_ANCHOR_TEXTS": ["电话", "短信", "微信", "相机", "设置", "图库"],
+            "HOME_SCREEN_ANCHOR_TEXTS": ["Phone", "Messages", "Settings", "Camera", "Gallery"],
             "HOME_SCREEN_MIN_ANCHORS": 3,
             "COORDINATE_MAP": {"scale_x": 1.0, "offset_y": 10}, # 这个用于像素内的微调 (如果需要)
             # --- 新增：设备在机器人坐标系中的物理原点偏移 ---
@@ -157,6 +158,9 @@ try:
                 else:
                     CONFIG[key] = value  # 直接使用加载的值（覆盖默认）
         logger.info("Configuration loaded from config.json")
+    env_ai_key = os.environ.get("SMARTPHONE_AUTOMATION_AI_API_KEY")
+    if env_ai_key:
+        CONFIG["AI_API_KEY"] = env_ai_key
 except Exception as e:
     logger.error(f"加载配置文件 config.json 错误: {str(e)}", exc_info=True)
 
@@ -982,10 +986,15 @@ class AIAnalyzer:
                 # --- 新增：记录完整的原始 AI 响应 ---
                 # 使用 json.dumps 美化输出，ensure_ascii=False 保留中文
                 try:
-                    raw_response_str = json.dumps(result, indent=2, ensure_ascii=False)
+                    safe_response = copy.deepcopy(result)
+                    for choice in safe_response.get("choices", []):
+                        message = choice.get("message")
+                        if isinstance(message, dict) and "content" in message:
+                            message["content"] = "[redacted: AI response content hidden from logs]"
+                    raw_response_str = json.dumps(safe_response, indent=2, ensure_ascii=False)
                 except Exception as json_err:
-                    raw_response_str = f"无法序列化为JSON: {result} (错误: {json_err})"  # 异常处理
-                ai_decision_logger.info(f"--- 完整 AI 响应 ---\n{raw_response_str}\n--------------------")
+                    raw_response_str = f"无法序列化脱敏后的AI响应: {json_err}"
+                ai_decision_logger.debug(f"--- 脱敏 AI 响应元数据 ---\n{raw_response_str}\n--------------------")
                 # --- 新增结束 ---
 
                 # --- 原有的响应解析逻辑 ---

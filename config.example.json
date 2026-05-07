@@ -1,0 +1,42 @@
+{
+  "ESP_IP": "192.0.2.10",
+  "ESP_PORT": 8080,
+  "SCREENSHOT_RESOLUTION": [1080, 1920],
+  "CROPPED_RESOLUTION": [1080, 1440],
+  "OCR_API_URL": "http://127.0.0.1:1224/api/ocr",
+  "AI_API_URL": "https://api.example.com/v1/chat/completions",
+  "AI_API_KEY": "",
+  "AI_MODEL": "example-model",
+  "ADB_PATH": "adb",
+  "CAMERA_DEVICE_ID": "",
+  "COMMAND_TIMEOUT": 15,
+  "WAIT_TIMEOUT": 300,
+  "RETRY_COUNT": 3,
+  "SUBTASK_RETRY_COUNT": 1,
+  "TASK_POLLING_INTERVAL": 1,
+  "CAMERA_STABILIZATION_DELAY_SECONDS": 1.0,
+  "MAX_TASK_TIME": 3600,
+  "AI_INTERVENTION_TIMEOUT": 300,
+  "HUMAN_INTERVENTION_ALERT": true,
+  "MIN_ESP_COMMAND_INTERVAL": 0.05,
+  "ADB_COMMAND_TIMEOUT": 20,
+  "OCR_CONFIDENCE_THRESHOLD": 0.6,
+  "TEMPLATE_MATCHING_THRESHOLD": 0.75,
+  "DEVICE_CONFIGS": {
+    "Device_Example": {
+      "SCREENSHOT_RESOLUTION": [1080, 1920],
+      "CROPPED_RESOLUTION": [1080, 1440],
+      "HOME_SCREEN_TEMPLATE_NAME": "home_template_example",
+      "HOME_SCREEN_TEMPLATE_THRESHOLD": 0.8,
+      "HOME_SCREEN_ANCHOR_TEXTS": ["Phone", "Messages", "Settings", "Camera", "Gallery"],
+      "HOME_SCREEN_MIN_ANCHORS": 3,
+      "COORDINATE_MAP": {
+        "scale_x": 1.0,
+        "offset_y": 10
+      },
+      "machine_origin_x": 0,
+      "machine_origin_y": 0
+    }
+  },
+  "USER_TASKS": []
+}
