@@ -2,7 +2,9 @@
 
 Physical automation prototype for operating a phone-like device with a three-axis slider, OCR, AI planning, and a stylus end effector.
 
-![Hardware prototype](assets/hardware-prototype.jpg)
+<p align="center">
+  <img src="assets/hardware-prototype.jpg" alt="Hardware prototype" width="520">
+</p>
 
 ![Operation demo](assets/operation-demo.gif)
 
@@ -271,4 +273,3 @@ Best next steps:
 - add real serial/TCP bridge tests
 - implement limit-switch-aware homing
 - add coordinate calibration tools for the phone clamp and stylus tip
-
