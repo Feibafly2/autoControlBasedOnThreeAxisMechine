@@ -15,6 +15,32 @@ The basic workflow is:
 5. Send commands to an ESP-based controller that drives a three-axis mechanism.
 6. Repeat until the task is complete or requires human intervention.
 
+## Hardware Prototype
+
+![Hardware prototype](assets/hardware-prototype.jpg)
+
+This repository now includes a sanitized hardware profile for the current build:
+
+- Dual-Y XYZ lead-screw slider
+- TB6600 stepper drivers x3
+- Arduino Uno R3 motion controller
+- ESP8266 network bridge
+- LRS-150-24 24V power supply
+- NPN normally-open proximity switches x6
+- Touch stylus end effector
+
+The slider uses 8 mm lead screws with 8 mm/rev lead. With 200-step/rev motors and 8 microsteps, the calculated movement constant is:
+
+```text
+200 steps/rev * 8 microsteps / 8 mm/rev = 200 steps/mm
+```
+
+See:
+
+- `docs/hardware-setup.md`
+- `configs/hardware.feibafly2.example.json`
+- `firmware/arduino_uno_motion_controller/arduino_uno_motion_controller.ino`
+
 ## Features
 
 - PyQt5 desktop interface for device, task, OCR, AI, and controller settings.
@@ -110,11 +136,35 @@ Run:
 python main.py
 ```
 
+## Simulated Link Check
+
+Before moving real hardware, verify the controller protocol with the local simulator:
+
+```bash
+python scripts/simulate_link_check.py
+```
+
+This starts a TCP motion-controller simulator on `127.0.0.1:8080`, sends representative commands, validates `OK` responses, and shuts the simulator down.
+
+To run the simulator manually:
+
+```bash
+python -m automation.simulator --host 127.0.0.1 --port 8080
+```
+
+Then set `ESP_IP` to `127.0.0.1` and `ESP_PORT` to `8080` in your private `config.json`.
+
 ## Project Status
 
 This is an early prototype. It is useful as a record of the architecture and experimentation, but it still needs refactoring before it should be treated as production software.
 
 The current implementation is mostly contained in a single large `main.py`, so future work should prioritize splitting the project into modules, improving tests, and making configuration safer by design.
+
+The first extraction has started around the motion-control boundary:
+
+- `automation/hardware_profile.py`
+- `automation/simulator.py`
+- `scripts/simulate_link_check.py`
 
 ## Security Notes
 

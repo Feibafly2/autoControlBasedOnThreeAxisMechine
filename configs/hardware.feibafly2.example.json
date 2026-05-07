@@ -1,0 +1,88 @@
+{
+  "machine": {
+    "name": "Feibafly2 dual-Y three-axis slider",
+    "type": "dual_y_xyz_lead_screw_slider",
+    "lead_screw_pitch_mm_per_rev": 8.0,
+    "guide_rod_diameter_mm": 8.0,
+    "profile": "2040 aluminum extrusion",
+    "travel_mm": {
+      "x": 300.0,
+      "y": 300.0,
+      "z": 130.0
+    },
+    "steps_per_rev": 200,
+    "microsteps": 8,
+    "steps_per_mm": 200.0
+  },
+  "power": {
+    "supply": "LRS-150-24",
+    "voltage_v": 24,
+    "power_w": 150
+  },
+  "controllers": {
+    "motion_mcu": "Arduino Uno R3",
+    "network_bridge": "ESP8266",
+    "driver_model": "TB6600"
+  },
+  "drivers": {
+    "x": {
+      "driver": "TB6600",
+      "motors": 1,
+      "current_a": 1.5,
+      "microstep": 8,
+      "pul_pin": 2,
+      "dir_pin": 3,
+      "ena_pin": 4,
+      "enable_active_high": true
+    },
+    "y": {
+      "driver": "TB6600",
+      "motors": 2,
+      "wiring": "two 42 stepper motors in parallel",
+      "current_a": 3.5,
+      "microstep": 8,
+      "pul_pin": 5,
+      "dir_pin": 6,
+      "ena_pin": 7,
+      "enable_active_high": true
+    },
+    "z": {
+      "driver": "TB6600",
+      "motors": 1,
+      "current_a": 1.5,
+      "microstep": 8,
+      "pul_pin": 8,
+      "dir_pin": 9,
+      "ena_pin": 10,
+      "enable_active_high": true
+    }
+  },
+  "limit_switches": {
+    "type": "NPN normally-open proximity switch",
+    "count": 6,
+    "suggested_mapping": {
+      "x_min": "A0",
+      "x_max": "A1",
+      "y_min": "A2",
+      "y_max": "A3",
+      "z_min": "A4",
+      "z_max": "A5"
+    }
+  },
+  "tooling": {
+    "end_effector": "touch stylus",
+    "phone_mount": "phone clamp"
+  },
+  "wiring_materials": [
+    "Dupont wires",
+    "4P female motor cables",
+    "18AWG power wire, 10m",
+    "2-in 8-out distribution terminals x5",
+    "three-core power cable with three-pin plug"
+  ],
+  "software": {
+    "controller_protocol": "line-based TCP command protocol",
+    "default_simulator_host": "127.0.0.1",
+    "default_simulator_port": 8080
+  }
+}
